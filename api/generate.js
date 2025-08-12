@@ -138,8 +138,11 @@ Link stories/tests/model via trace where obvious.` }
 
     // If an image was uploaded, include it. Models with vision accept data URLs. (See "Images & vision" docs.)
     if (imageDataUrl) {
-      messages[1].content.push({ type: "image_url", image_url: imageDataUrl });
-    }
+  messages[1].content.push({
+    type: "image_url",
+    image_url: { url: imageDataUrl /*, detail: "high" */ }
+  });
+}
 
     // Call OpenAI Chat Completions with Structured Outputs (JSON Schema)
     // API reference: Chat + Structured Outputs. Models doc lists GPT-5 family.
