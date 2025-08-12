@@ -148,11 +148,11 @@ Link stories/tests/model via trace where obvious.` }
     // API reference: Chat + Structured Outputs. Models doc lists GPT-5 family.
     // https://platform.openai.com/ (docs cited below)
     const body = {
-      model: model || "gpt-5",
-      messages,
-      temperature: 0.2,
-      response_format: { type: "json_schema", json_schema: schema() }
-    };
+  model: model || "gpt-5",
+  messages,
+  // Remove temperature or comment it out
+  response_format: { type: "json_schema", json_schema: schema() }
+};
 
     const resp = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
