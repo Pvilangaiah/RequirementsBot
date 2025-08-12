@@ -7,27 +7,21 @@ function schema() {
     schema: {
       type: "object",
       additionalProperties: false,
+      required: ["userStories","declarativeStories","imperativeTests","uiDataModel","validationReport"],
       properties: {
         userStories: {
           type: "array",
           items: {
             type: "object",
-            additionalProperties: false,
+            additionalProperties: false,       // <-- MUST be here
             required: ["id","as_a","i_want","so_that","acceptance_criteria"],
             properties: {
               id: { type: "string" },
               as_a: { type: "string" },
               i_want: { type: "string" },
               so_that: { type: "string" },
-              acceptance_criteria: { type: "array", items: { type: "string" } },
-              trace: {
-                type: "object",
-                additionalProperties: false,
-                properties: {
-                  ui_nodes: { type: "array", items: { type: "string" } },
-                  entities: { type: "array", items: { type: "string" } }
-                }
-              }
+              acceptance_criteria: { type: "array", items: { type: "string" } }
+              // add "trace" later once it's working (strict mode hates free-form objects)
             }
           }
         },
@@ -48,15 +42,8 @@ function schema() {
                   properties: {
                     given: { type: "string" },
                     when: { type: "string" },
-                    then: { type: "string" },
-                    examples: {
-                      type: "array",
-                      items: {
-                        type: "object",
-                        additionalProperties: false,
-                        properties: {} // free-form rows not allowed in strict mode; expand keys if you know them
-                      }
-                    }
+                    then: { type: "string" }
+                    // add examples later
                   }
                 }
               }
@@ -71,19 +58,16 @@ function schema() {
             required: ["name","gherkin","tags"],
             properties: {
               name: { type: "string" },
-              tags: { type: "array", items: { type: "string" } },
               gherkin: { type: "string" },
-              selectors: {
-                type: "object",
-                additionalProperties: false,
-                properties: {} // add exact selector keys if you want them enforced
-              }
+              tags: { type: "array", items: { type: "string" } }
+              // add selectors later
             }
           }
         },
         uiDataModel: {
           type: "object",
           additionalProperties: false,
+          required: ["entities"],
           properties: {
             entities: {
               type: "array",
@@ -102,43 +86,15 @@ function schema() {
                       properties: {
                         name: { type: "string" },
                         type: { type: "string" },
-                        required: { type: "boolean" },
-                        constraints: {
-                          type: "object",
-                          additionalProperties: false,
-                          properties: {
-                            minLength: { type: "number" },
-                            maxLength: { type: "number" },
-                            pattern: { type: "string" },
-                            minimum: { type: "number" },
-                            maximum: { type: "number" }
-                          }
-                        },
-                        enum: { type: "array", items: { type: "string" } }
-                      }
-                    }
-                  },
-                  relations: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      additionalProperties: false,
-                      properties: {
-                        type: { type: "string" },   // e.g., one-to-many
-                        target: { type: "string" }, // entity name
-                        on: { type: "string" }      // join field
+                        required: { type: "boolean" }
+                        // add constraints/enum later
                       }
                     }
                   }
+                  // add relations later
                 }
               }
-            },
-            jsonSchemas: {
-              type: "object",
-              additionalProperties: false,
-              properties: {} // if you want arbitrary entity names here, consider moving them to a list instead of a map when strict=true
-            },
-            sqlDDL: { type: "string" }
+            }
           }
         },
         validationReport: {
@@ -159,18 +115,10 @@ function schema() {
             notes: { type: "array", items: { type: "string" } }
           }
         }
-      },
-      required: [
-        "userStories",
-        "declarativeStories",
-        "imperativeTests",
-        "uiDataModel",
-        "validationReport"
-      ]
+      }
     }
   };
 }
-
 export default async function handler(req) {
   try {
     if (req.method !== 'POST') {
