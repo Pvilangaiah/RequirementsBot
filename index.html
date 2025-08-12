@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Requirements Copilot (MVP)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
+    body { margin: 0; background: #0b1020; color: #e7ecff; }
+    .wrap { max-width: 900px; margin: 32px auto; padding: 16px; }
+    .card { background: #11183a; border: 1px solid #223; border-radius: 14px; padding: 18px; box-shadow: 0 6px 24px rgba(0,0,0,.25); }
+    label { font-weight: 600; display: block; margin-top: 12px; margin-bottom: 6px; }
+    input, textarea, select, button {
+      width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #334;
+      background: #0d1430; color: #e7ecff; outline: none;
+    }
+    textarea { min-height: 140px; resize: vertical; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .actions { display: flex; gap: 12px; margin-top: 16px; }
+    button { cursor: pointer; font-weight: 700; }
+    .btn-primary { background: #4c7cff; border-color: #4c7cff; }
+    .btn-soft { background: #1a224a; border-color: #2a3566; }
+    .muted { color: #9bb0ff; font-size: 12px; }
+    pre { background: #0a1130; border: 1px solid #223; padding: 12px; border-radius: 10px; overflow: auto; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    .tabs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 16px 0 8px; }
+    .tab { background:#0d1430; border:1px solid #223; border-radius: 10px; padding: 10px; text-align:center; cursor:pointer; }
+    .tab.active { background:#1c2655; border-color:#4c7cff; }
+    .hidden { display:none; }
+    .error { background:#3b1020; border:1px solid #70324f; color:#ffccd8; padding:10px; border-radius:10px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Requirements Copilot (MVP)</h1>
+    <p class="muted">Paste a Figma URL or upload a screen. Add your rules. Click Generate to get User Stories, Declarative Scenarios, Imperative Tests, a UI Data Model, and a Validation Report—as JSON you can download.</p>
+
+    <div class="card grid">
+      <div class="row">
+        <div>
+          <label>Figma file URL (optional)</label>
+          <input id="figmaUrl" placeholder="https://www.figma.com/file/..." />
+        </div>
+        <div>
+          <label>Upload design image (PNG/JPG, &lt; 2 MB, optional)</label>
+          <input id="image" type="file" accept="image/png,image/jpeg" />
+          <div class="muted">If both Figma URL and image are provided, both will be analyzed.</div>
+        </div>
+      </div>
+
+      <label>Product brief or context (optional)</label>
+      <textarea id="brief" placeholder="What is this screen or flow for? Who is the user? Any domain rules?"></textarea>
+
+      <label>Rules & validation guidelines</label>
+      <textarea id="rules"></textarea>
+      <div class="muted">Tip: Keep rules simple at first; you can refine after you see output.</div>
+
+      <div class="row">
+        <div>
+          <label>Model</label>
+          <select id="model">
+            <option value="gpt-5">gpt-5 (best quality)</option>
+            <option value="gpt-5-mini">gpt-5-mini (cheaper/faster)</option>
+          </select>
+        </div>
+        <div>
+          <label>Output detail level</label>
+          <select id="detail">
+            <option value="standard">Standard</option>
+            <option value="exhaustive">Exhaustive (more tests/cases)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn-primary" id="go">Generate</button>
+        <button class="btn-soft" id="clear">Clear</button>
+      </div>
+      <div id="status" class="muted"></div>
+      <div id="error" class="error hidden"></div>
+    </div>
+
+    <div class="card" id="results" style="margin-top:16px;">
+      <div class="tabs">
+        <div class="tab active" data-target="stories">User Stories</div>
+        <div class="tab" data-target="decl">Declarative Scenarios</div>
+        <div class="tab" data-target="tests">Imperative Tests</div>
+        <div class="tab" data-target="model">UI Data Model</div>
+        <div class="tab" data-target="validation">Validation Report</div>
+      </div>
+      <div id="stories"><pre id="out-stories">{}</pre><div class="actions"><button class="btn-soft" id="dl-stories">Download JSON</button></div></div>
+      <div id="decl" class="hidden"><pre id="out-decl">{}</pre><div class="actions"><button class="btn-soft" id="dl-decl">Download JSON</button></div></div>
+      <div id="tests" class="hidden"><pre id="out-tests">{}</pre><div class="actions"><button class="btn-soft" id="dl-tests">Download JSON</button></div></div>
+      <div id="model" class="hidden"><pre id="out-model">{}</pre><div class="actions"><button class="btn-soft" id="dl-model">Download JSON</button></div></div>
+      <div id="validation" class="hidden"><pre id="out-validation">{}</pre><div class="actions"><button class="btn-soft" id="dl-validation">Download JSON</button></div></div>
+    </div>
+  </div>
+
+  <script>
+    const rulesDefault = `# Keep it simple to start; edit anytime.
+language:
+  avoid_ambiguous_words: [fast, user-friendly, optimize, robust]
+  require_active_voice: true
+
+acceptance_criteria:
+  require_success_and_error: true
+  require_empty_and_permission_paths: true
+
+tests:
+  buckets: [happy, boundary, negative, security, accessibility]
+  boundary_min_cases_per_field: 1
+
+data_model:
+  email_fields_regex: "(?i)email"
+  phone_fields_regex: "(?i)phone|mobile"
+  required_ui_fields_must_be_non_nullable: true
+`;
+
+    document.getElementById('rules').value = rulesDefault;
+
+    function setStatus(msg){ document.getElementById('status').textContent = msg || ''; }
+    function setError(msg){
+      const box = document.getElementById('error');
+      if(!msg){ box.classList.add('hidden'); box.textContent=''; return; }
+      box.classList.remove('hidden'); box.textContent = msg;
+    }
+
+    function tabHandlers(){
+      document.querySelectorAll('.tab').forEach(t=>{
+        t.addEventListener('click', ()=>{
+          document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+          document.querySelectorAll('#results > div:not(.tabs)').forEach(x=>x.classList.add('hidden'));
+          t.classList.add('active');
+          document.getElementById(t.dataset.target).classList.remove('hidden');
+        });
+      });
+    }
+    tabHandlers();
+
+    function downloadJSON(obj, filename){
+      const blob = new Blob([JSON.stringify(obj, null, 2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    async function fileToDataURL(file){
+      if(!file) return null;
+      if(file.size > 2 * 1024 * 1024) throw new Error('Image too large (max 2 MB).');
+      return new Promise((resolve, reject)=>{
+        const r = new FileReader();
+        r.onload = () => resolve(r.result);
+        r.onerror = reject;
+        r.readAsDataURL(file);
+      });
+    }
+
+    document.getElementById('clear').addEventListener('click', ()=>{
+      document.getElementById('figmaUrl').value = '';
+      document.getElementById('image').value = '';
+      document.getElementById('brief').value = '';
+      document.getElementById('rules').value = rulesDefault;
+      ['out-stories','out-decl','out-tests','out-model','out-validation'].forEach(id=>{
+        document.getElementById(id).textContent = '{}';
+      });
+      setStatus('Cleared.');
+      setError('');
+    });
+
+    document.getElementById('go').addEventListener('click', async ()=>{
+      try{
+        setError('');
+        setStatus('Reading inputs…');
+        const figmaUrl = document.getElementById('figmaUrl').value.trim();
+        const brief = document.getElementById('brief').value.trim();
+        const rules = document.getElementById('rules').value;
+        const model = document.getElementById('model').value;
+        const detail = document.getElementById('detail').value;
+        const imageFile = document.getElementById('image').files[0];
+        const imageDataUrl = await fileToDataURL(imageFile);
+
+        setStatus('Calling generator… (this can take 10–30s)');
+        const resp = await fetch('/api/generate', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ figmaUrl, brief, rules, model, detail, imageDataUrl })
+        });
+        if(!resp.ok){
+          const text = await resp.text();
+          throw new Error('Server error: ' + text);
+        }
+        const data = await resp.json();
+
+        const { userStories, declarativeStories, imperativeTests, uiDataModel, validationReport } = data;
+
+        document.getElementById('out-stories').textContent = JSON.stringify(userStories, null, 2);
+        document.getElementById('out-decl').textContent = JSON.stringify(declarativeStories, null, 2);
+        document.getElementById('out-tests').textContent = JSON.stringify(imperativeTests, null, 2);
+        document.getElementById('out-model').textContent = JSON.stringify(uiDataModel, null, 2);
+        document.getElementById('out-validation').textContent = JSON.stringify(validationReport, null, 2);
+
+        document.getElementById('dl-stories').onclick = ()=>downloadJSON(userStories, 'user_stories.json');
+        document.getElementById('dl-decl').onclick = ()=>downloadJSON(declarativeStories, 'declarative_stories.json');
+        document.getElementById('dl-tests').onclick = ()=>downloadJSON(imperativeTests, 'imperative_tests.json');
+        document.getElementById('dl-model').onclick = ()=>downloadJSON(uiDataModel, 'ui_data_model.json');
+        document.getElementById('dl-validation').onclick = ()=>downloadJSON(validationReport, 'validation_report.json');
+
+        setStatus('Done ✅ Review each tab, then download.');
+      }catch(err){
+        setError(err.message || String(err));
+        setStatus('');
+      }
+    });
+  </script>
+</body>
+</html>
