@@ -12,15 +12,22 @@ function schema() {
           type: "array",
           items: {
             type: "object",
+            additionalProperties: false,
             required: ["id","as_a","i_want","so_that","acceptance_criteria"],
-            additionalProperties: true,
             properties: {
               id: { type: "string" },
               as_a: { type: "string" },
               i_want: { type: "string" },
               so_that: { type: "string" },
               acceptance_criteria: { type: "array", items: { type: "string" } },
-              trace: { type: "object" }
+              trace: {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  ui_nodes: { type: "array", items: { type: "string" } },
+                  entities: { type: "array", items: { type: "string" } }
+                }
+              }
             }
           }
         },
@@ -28,18 +35,31 @@ function schema() {
           type: "array",
           items: {
             type: "object",
+            additionalProperties: false,
             required: ["title","scenarios"],
             properties: {
               title: { type: "string" },
-              scenarios: { type: "array", items: { type: "object",
-                required: ["given","when","then"],
-                properties: {
-                  given: { type: "string" },
-                  when: { type: "string" },
-                  then: { type: "string" },
-                  examples: { type: "array", items: { type: "object" } }
+              scenarios: {
+                type: "array",
+                items: {
+                  type: "object",
+                  additionalProperties: false,
+                  required: ["given","when","then"],
+                  properties: {
+                    given: { type: "string" },
+                    when: { type: "string" },
+                    then: { type: "string" },
+                    examples: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        additionalProperties: false,
+                        properties: {} // free-form rows not allowed in strict mode; expand keys if you know them
+                      }
+                    }
+                  }
                 }
-              } }
+              }
             }
           }
         },
@@ -47,45 +67,92 @@ function schema() {
           type: "array",
           items: {
             type: "object",
+            additionalProperties: false,
             required: ["name","gherkin","tags"],
             properties: {
               name: { type: "string" },
               tags: { type: "array", items: { type: "string" } },
               gherkin: { type: "string" },
-              selectors: { type: "object" }
+              selectors: {
+                type: "object",
+                additionalProperties: false,
+                properties: {} // add exact selector keys if you want them enforced
+              }
             }
           }
         },
         uiDataModel: {
           type: "object",
+          additionalProperties: false,
           properties: {
-            entities: { type: "array", items: {
-              type: "object",
-              required: ["name","fields"],
-              properties: {
-                name: { type: "string" },
-                fields: { type: "array", items: {
-                  type: "object",
-                  required: ["name","type"],
-                  properties: {
-                    name: { type: "string" },
-                    type: { type: "string" },
-                    required: { type: "boolean" },
-                    constraints: { type: "object" },
-                    enum: { type: "array", items: { type: "string" } }
+            entities: {
+              type: "array",
+              items: {
+                type: "object",
+                additionalProperties: false,
+                required: ["name","fields"],
+                properties: {
+                  name: { type: "string" },
+                  fields: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      additionalProperties: false,
+                      required: ["name","type"],
+                      properties: {
+                        name: { type: "string" },
+                        type: { type: "string" },
+                        required: { type: "boolean" },
+                        constraints: {
+                          type: "object",
+                          additionalProperties: false,
+                          properties: {
+                            minLength: { type: "number" },
+                            maxLength: { type: "number" },
+                            pattern: { type: "string" },
+                            minimum: { type: "number" },
+                            maximum: { type: "number" }
+                          }
+                        },
+                        enum: { type: "array", items: { type: "string" } }
+                      }
+                    }
+                  },
+                  relations: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      additionalProperties: false,
+                      properties: {
+                        type: { type: "string" },   // e.g., one-to-many
+                        target: { type: "string" }, // entity name
+                        on: { type: "string" }      // join field
+                      }
+                    }
                   }
-                } },
-                relations: { type: "array", items: { type: "object" } }
+                }
               }
-            } },
-            jsonSchemas: { type: "object" },
+            },
+            jsonSchemas: {
+              type: "object",
+              additionalProperties: false,
+              properties: {} // if you want arbitrary entity names here, consider moving them to a list instead of a map when strict=true
+            },
             sqlDDL: { type: "string" }
           }
         },
         validationReport: {
           type: "object",
+          additionalProperties: false,
           properties: {
-            coverage: { type: "object" },
+            coverage: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                uiComponentsCoveredPct: { type: "number" },
+                fieldsWithTestsPct: { type: "number" }
+              }
+            },
             conflicts: { type: "array", items: { type: "string" } },
             ambiguities: { type: "array", items: { type: "string" } },
             missing: { type: "array", items: { type: "string" } },
@@ -93,7 +160,13 @@ function schema() {
           }
         }
       },
-      required: ["userStories","declarativeStories","imperativeTests","uiDataModel","validationReport"]
+      required: [
+        "userStories",
+        "declarativeStories",
+        "imperativeTests",
+        "uiDataModel",
+        "validationReport"
+      ]
     }
   };
 }
